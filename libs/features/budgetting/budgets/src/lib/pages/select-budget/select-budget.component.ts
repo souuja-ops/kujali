@@ -1,8 +1,10 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, computed, inject, Signal } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
+import { toSignal } from '@angular/core/rxjs-interop';
 
 import { cloneDeep as ___cloneDeep, flatMap as __flatMap } from 'lodash';
-import { Observable, combineLatest, map, tap } from 'rxjs';
+import { Observable, combineLatest, map } from 'rxjs';
 
 import { Logger } from '@iote/bricks-angular';
 
@@ -18,6 +20,7 @@ import { CreateBudgetModalComponent } from '../../components/create-budget-modal
   templateUrl: './select-budget.component.html',
   styleUrls: ['./select-budget.component.scss', 
               '../../components/budget-view-styles.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 /** List of all active budgets on the system. */
 export class SelectBudgetPageComponent implements OnInit
@@ -32,11 +35,31 @@ export class SelectBudgetPageComponent implements OnInit
 
   allBudgets$: Observable<{overview: BudgetRecord[], budgets: any[]}>;
 
-  constructor(private _orgBudgets$$: OrgBudgetsStore,
-              private _budgets$$: BudgetsStore,
-              private _dialog: MatDialog,
-              private _logger: Logger) 
-  { }
+  readonly overview: Signal<OrgBudgetsOverview | undefined> = toSignal<OrgBudgetsOverview | undefined>(
+    this._orgBudgets$$.get(),
+    { initialValue: undefined }
+  );
+  readonly sharedBudgets: Signal<any[] | undefined> = toSignal<any[] | undefined>(
+    this._budgets$$.get(),
+    { initialValue: undefined }
+  );
+  readonly allBudgets = computed(() => {
+    const overview = this.overview();
+    const budgets = this.sharedBudgets();
+    const flOverview = overview ? __flatMap(overview) : [];
+    const flBudgets = budgets ? __flatMap(budgets) : [];
+    const trBudgets = flBudgets.map((budget: any) => {
+      budget['endYear'] = budget.startYear + budget.duration - 1; return budget;
+    });
+    return { overview: flOverview, budgets: trBudgets };
+  });
+
+  private _orgBudgets$$ = inject(OrgBudgetsStore);
+  private _budgets$$ = inject(BudgetsStore);
+  private _dialog = inject(MatDialog);
+  private _logger = inject(Logger);
+
+  constructor() { }
 
   ngOnInit() {
     this.overview$ = this._orgBudgets$$.get();

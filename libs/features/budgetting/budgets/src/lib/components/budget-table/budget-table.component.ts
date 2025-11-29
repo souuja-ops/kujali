@@ -1,12 +1,9 @@
-import { Component, EventEmitter, Input, Output, ViewChild } from '@angular/core';
-import { MatTable, MatTableDataSource } from '@angular/material/table';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, ViewChild, effect, input, inject } from '@angular/core';
+import { MatTableDataSource } from '@angular/material/table';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSort } from '@angular/material/sort';
 import { Router } from '@angular/router';
-
-import { SubSink } from 'subsink';
-import { Observable, tap } from 'rxjs';
 
 import { Budget, BudgetRecord } from '@app/model/finance/planning/budgets';
 
@@ -18,13 +15,11 @@ import { ChildBudgetsModalComponent } from '../../modals/child-budgets-modal/chi
   selector: 'app-budget-table',
   templateUrl: './budget-table.component.html',
   styleUrls: ['./budget-table.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 
 export class BudgetTableComponent {
-
-  private _sbS = new SubSink();
-
-  @Input() budgets$: Observable<{overview: BudgetRecord[], budgets: any[]}>;
+  budgets = input<{ overview: BudgetRecord[]; budgets: any[] }>();
   @Input() canPromote = false;
 
   @Output() doPromote: EventEmitter<void> = new EventEmitter();
@@ -38,15 +33,16 @@ export class BudgetTableComponent {
 
   overviewBudgets: BudgetRecord[] = [];
 
-  constructor(private _router$$: Router,
-              private _dialog: MatDialog,
-  ) { }
+  private _router$$ = inject(Router);
+  private _dialog = inject(MatDialog);
 
   ngOnInit(): void {
-    this._sbS.sink = this.budgets$.pipe(tap((o) => {
+    effect(() => {
+      const o = this.budgets();
+      if (!o) return;
       this.overviewBudgets = o.overview;
       this.dataSource.data = o.budgets;
-    })).subscribe();
+    });
   }
 
   /** 
